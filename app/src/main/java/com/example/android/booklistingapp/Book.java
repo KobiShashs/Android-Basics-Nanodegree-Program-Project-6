@@ -1,11 +1,14 @@
 package com.example.android.booklistingapp;
 
+import android.os.Parcel;
+import android.os.Parcelable;
+
 import java.util.ArrayList;
 
 /**
  * Created by user on 7/26/2016.
  */
-public class Book {
+public class Book implements Parcelable{
     private String mName;
     private String mAuthor;
 
@@ -34,6 +37,15 @@ public class Book {
         }
         this.mAuthor = finalString;
     }
+    private Book(Parcel in) {
+        mName = in.readString();
+        mAuthor = in.readString();
+    }
+
+    public void writeToParcel(Parcel out, int flags) {
+        out.writeString(mName);
+        out.writeString(mAuthor);
+    }
 
 
     public String getmName() {
@@ -44,5 +56,18 @@ public class Book {
         return mAuthor;
     }
 
+    public int describeContents() {
+        return 0;
+    }
 
+    public static final Parcelable.Creator<Book> CREATOR  =
+            new Parcelable.Creator<Book>() {
+        public Book createFromParcel(Parcel in) {
+            return new Book(in);
+        }
+
+        public Book[] newArray(int size) {
+            return new  Book[size];
+        }
+    };
 }

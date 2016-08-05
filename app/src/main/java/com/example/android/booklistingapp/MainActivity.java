@@ -1,6 +1,8 @@
 package com.example.android.booklistingapp;
 
+import android.app.ProgressDialog;
 import android.app.usage.UsageEvents;
+import android.content.res.Configuration;
 import android.os.AsyncTask;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -26,23 +28,34 @@ import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 
+/***
+ * http://stackoverflow.com/questions/19043243/error-org-json-jsonexception-no-value-for-project-name-this-is-my-json
+ */
 public class MainActivity extends AppCompatActivity {
 
     /**
      * Tag for the log messages
      */
     public static final String LOG_TAG = MainActivity.class.getSimpleName();
-
+    private ProgressDialog progDailog;
+    private ArrayList<Book> data = new ArrayList<>();
+    BooksAdapter adapter;
+    ListView listView;
     /**
      * URL to query the USGS dataset for earthquake information
      */
     private static String USGS_REQUEST_URL =
             "https://www.googleapis.com/books/v1/volumes?q=";
+    private static String DEFAULT_USGS_REQUEST_URL =
+            "https://www.googleapis.com/books/v1/volumes?q=";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+
         setContentView(R.layout.activity_main);
+
 
         //Search field
         final EditText editTextSearch = (EditText) findViewById(R.id.search_edit_text);
@@ -52,23 +65,52 @@ public class MainActivity extends AppCompatActivity {
         buttonSearch.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                USGS_REQUEST_URL = DEFAULT_USGS_REQUEST_URL;
                 USGS_REQUEST_URL += editTextSearch.getText().toString();
                 USGS_REQUEST_URL = USGS_REQUEST_URL.replace(" ", "+");
-                BooksAsyncTask task = new BooksAsyncTask();
-                task.execute();
+                new BooksAsyncTask().execute();
             }
         });
 
 
     }
 
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        setContentView(R.layout.activity_main);
+
+    }
+
+    //Save list when state changes
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        outState.putSerializable("key", data);
+        super.onSaveInstanceState(outState);
+    }
+
+    //restore list when state changes
+    @Override
+    protected void onRestoreInstanceState(Bundle savedInstanceState) {
+        if (savedInstanceState != null) {
+            data = (ArrayList<Book>) savedInstanceState.getSerializable("key");
+            adapter = new BooksAdapter(getApplicationContext(), data);
+            listView = (ListView) findViewById(R.id.list);
+            listView.setAdapter(adapter);
+        }
+        super.onRestoreInstanceState(savedInstanceState);
+    }
+
     /***
      * This function update Ui with the books list
+     *
      * @param books
      */
     private void updateUi(ArrayList<Book> books) {
-        BooksAdapter adapter = new BooksAdapter(getApplicationContext(), books);
-        ListView listView = (ListView) findViewById(R.id.list);
+        data = books;
+        adapter = new BooksAdapter(getApplicationContext(), books);
+        listView = (ListView) findViewById(R.id.list);
+        listView.setEmptyView(findViewById(R.id.empty_list_item));
         listView.setAdapter(adapter);
     }
 
@@ -164,9 +206,9 @@ public class MainActivity extends AppCompatActivity {
             for (int i = 0; i < itemsArray.length(); i++) {
                 JSONObject bookItem = itemsArray.getJSONObject(i);
                 JSONObject volumeInfo = bookItem.getJSONObject("volumeInfo");
-                String title = volumeInfo.getString("title");
-                String author = volumeInfo.getString("authors");
-                JSONArray bookAuthorArray = volumeInfo.getJSONArray("authors");
+                String title = volumeInfo.optString("title");
+                String author = volumeInfo.optString("authors");
+                JSONArray bookAuthorArray = volumeInfo.optJSONArray("authors");
 
                 Book book = new Book(author, title);
                 results.add(book);
@@ -182,6 +224,17 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private class BooksAsyncTask extends AsyncTask<URL, Void, ArrayList<Book>> {
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            progDailog = new ProgressDialog(MainActivity.this);
+            progDailog.setMessage("Loading...");
+            progDailog.setIndeterminate(false);
+            progDailog.setProgressStyle(ProgressDialog.STYLE_SPINNER);
+            progDailog.setCancelable(true);
+            progDailog.show();
+        }
 
         @Override
         protected ArrayList<Book> doInBackground(URL... urls) {
@@ -208,8 +261,8 @@ public class MainActivity extends AppCompatActivity {
             if (books == null) {
                 return;
             }
-
             updateUi(books);
+            progDailog.dismiss();
         }
     }
 }
